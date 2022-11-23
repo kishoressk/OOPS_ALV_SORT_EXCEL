@@ -1,0 +1,463 @@
+REPORT rdd_fin_015.
+**************************************
+* Local Data Declaration
+**************************************
+DATA:lv_so_bukrs TYPE bukrs,   "Company Code
+     lv_so_werks TYPE werks_d, "Plant
+     lv_so_lddat TYPE lddat,   "Shipping date
+     lv_so_fkdat TYPE fkdat,   "Billing date
+     lv_so_netwr TYPE netwr.   "Net Value
+
+*Local Objects declaratio
+DATA: toolbar TYPE REF TO cl_salv_functions_list .
+*DATA: gr_table  TYPE REF TO cl_salv_table.
+DATA: lr_aggregations TYPE REF TO cl_salv_aggregations.
+DATA: lr_groups TYPE REF TO cl_salv_sorts .
+*******************************************************************************
+* Selection screen
+*******************************************************************************
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE title.
+
+SELECT-OPTIONS:s_bukrs  FOR lv_so_bukrs,"Company Code
+               s_werks  FOR lv_so_werks,"Plant
+               s_lddat  FOR lv_so_lddat,"Shipping
+               s_fkdat  FOR lv_so_fkdat,"Shipping
+               s_netwr  FOR lv_so_netwr."Shipping
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+*******************************************************************************
+* INITIALIZATION
+*******************************************************************************
+INITIALIZATION.
+  title = 'Shipped not received reversal booking reporting '(002).
+
+*******************************************************************************
+*START-OF-SELECTION.
+*******************************************************************************
+START-OF-SELECTION.
+*******************************************************************************
+*START-OF-SELECTION.
+*******************************************************************************
+CLASS zcl_main DEFINITION.
+  PUBLIC SECTION.
+
+    TYPES:BEGIN OF lty_vbrk,
+            vbeln TYPE vbeln,
+          END OF   lty_vbrk,
+
+          BEGIN OF lty_vbrp,
+            vbeln TYPE vbeln_vf ,  "Billing Document
+            posnr TYPE posnr_vf ,  "Billing item
+            matnr TYPE matnr_d,
+            wavwr TYPE wavwr   ,  "Cost in document currency
+            vbelv	TYPE vbelv,
+            werks TYPE werks_ext,
+          END OF   lty_vbrp,
+
+          BEGIN OF lty_vbfa,
+            vbelv	TYPE vbeln_von,
+            vbeln	TYPE vbeln_nach,
+            posnn TYPE posnr_nach,
+          END OF   lty_vbfa,
+
+          BEGIN OF lty_bkpf,
+            vbeln TYPE vbeln_nach,
+            belnr TYPE belnr_d,
+            monat TYPE monat,
+          END OF   lty_bkpf,
+
+          BEGIN OF lty_final,
+            vbeln TYPE vbeln_vf, "Billing Document
+            fkdat TYPE fkdat, "Billing date for billing index and printout
+            deliv TYPE vbeln , "Delivery
+            matnr TYPE matnr_d, "Material Number
+            werks TYPE werks_d, "Plant
+            lddat TYPE lddat, "Shipping Loading Date
+            lfdat TYPE lfdat_v, "Delivery Date
+            cogs  TYPE netwr,
+            netwr TYPE netwr, "Net Value in Document Currency
+
+            waerk TYPE waerk, "SD Document Currency
+            bukrs TYPE bukrs, "Company Code
+
+            wavwr TYPE wavwr, "Cost in document currency
+*
+*            vbelv TYPE vbeln_von,
+            belnr TYPE belnr_d,
+            monat TYPE monat,
+          END OF  lty_final.
+
+    TYPES:lty_t_vbrk TYPE lty_vbrk.
+    TYPES:lty_t_vbfa TYPE lty_vbfa.
+    TYPES:lty_t_bkpf TYPE lty_bkpf.
+
+    TYPES:lty_t_final TYPE STANDARD TABLE OF lty_final.
+
+*    DATA:lt_vbrk TYPE SORTED TABLE OF lty_vbrk WITH UNIQUE KEY vbeln.
+*    DATA:lt_vbrp TYPE SORTED TABLE OF lty_vbrp WITH UNIQUE KEY vbeln posnr.
+    DATA:lt_vbfa TYPE SORTED TABLE OF lty_vbfa WITH NON-UNIQUE KEY vbelv vbeln.
+    DATA:lt_bkpf TYPE SORTED TABLE OF lty_bkpf WITH NON-UNIQUE KEY belnr monat.
+
+
+    METHODS:execute  EXPORTING VALUE(lt_final) TYPE lty_t_final.
+
+
+
+ENDCLASS.
+TYPES:BEGIN OF lty_final,
+        vbeln TYPE vbeln_vf, "Billing Document
+        fkdat TYPE fkdat, "Billing date for billing index and printout
+        deliv TYPE vbeln , "Delivery
+        matnr TYPE matnr_d, "Material Number
+        werks TYPE werks_d, "Plant
+        lddat TYPE lddat, "Shipping Loading Date
+        lfdat TYPE lfdat_v, "Delivery Date
+        cogs  TYPE netwr,
+        netwr TYPE netwr, "Net Value in Document Currency
+
+        waerk TYPE waerk, "SD Document Currency
+        bukrs TYPE bukrs, "Company Code
+
+        wavwr TYPE wavwr, "Cost in document currency
+*
+*            vbelv TYPE vbeln_von,
+        belnr TYPE belnr_d,
+        monat TYPE monat,
+      END OF  lty_final.
+
+TYPES:lty_t_final TYPE STANDARD TABLE OF lty_final.
+DATA:lt_final1 TYPE lty_t_final.
+DATA(lref) = NEW zcl_main( ).
+
+
+lref->execute(
+*    EXPORTING
+*      it_date           = lt_date[]    " Transfer Structure for Select Options
+    IMPORTING
+      lt_final =  DATA(lt_final)   " DC Inward Details
+).
+TRY.
+    cl_salv_table=>factory(
+    IMPORTING
+      r_salv_table   = DATA(lr_alv)    " Basis Class Simple ALV Tables
+    CHANGING
+      t_table        = lt_final1
+  ).
+  CATCH cx_salv_msg.
+ENDTRY.
+
+DATA:lr_columns TYPE REF TO  cl_salv_columns_table,
+     lr_column  TYPE REF TO  cl_salv_column.
+
+"Get the reference  of cl_salv_columns_table class.
+lr_columns  =  lr_alv->get_columns( ).
+
+"Using the above refence call the below method to get the individual column reference.
+"Here we are changing the column name
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'VBELN'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+"Call the below method to change the column anme
+lr_column->set_long_text( value = 'VBELN'   ).
+lr_column->set_medium_text( value = 'VBELN '   ).
+lr_column->set_short_text( value = 'VBELN'   ).
+
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'FKDAT'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+"Call the below method to change the column anme
+lr_column->set_long_text( value = 'FKDAT'   ).
+lr_column->set_medium_text( value = 'FKDAT'   ).
+lr_column->set_short_text( value = 'FKDAT'   ).
+
+
+
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'DELIV'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+"Call the below method to change the column anme
+lr_column->set_long_text( value = 'Delivery'   ).
+lr_column->set_medium_text( value = 'Delivery'   ).
+lr_column->set_short_text( value = 'Delivery'   ).
+
+
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'MATNR'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+"Call the below method to change the column anme
+lr_column->set_long_text( value = 'MATNR'   ).
+lr_column->set_medium_text( value = 'MATNR '   ).
+lr_column->set_short_text( value = 'MATNR'   ).
+
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'WERKS'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+"Call the below method to change the column anme
+lr_column->set_long_text( value = ' WERKS'   ).
+lr_column->set_medium_text( value = ' WERKS '   ).
+lr_column->set_short_text( value = ' WERKS.'   ).
+
+
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'LDDAT'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+*Call the below method to change the column anme
+lr_column->set_long_text( value = ' LDDAT'   ).
+lr_column->set_medium_text( value = ' LDDAT '   ).
+lr_column->set_short_text( value = ' LDDAT.'   ).
+
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'LFDAT'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+"Call the below method to change the column anme
+lr_column->set_long_text( value = 'lfdat'   ).
+lr_column->set_medium_text( value = 'lfdat'   ).
+lr_column->set_short_text( value = ' lfdat .'   ).
+
+
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'COGS'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+"Call the below method to change the column anme
+lr_column->set_long_text( value = ' cogs'   ).
+lr_column->set_medium_text( value = ' cogs '   ).
+lr_column->set_short_text( value = ' cogs.'   ).
+
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'NETWR'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+"Call the below method to change the column anme
+lr_column->set_long_text( value = 'netwr'   ).
+lr_column->set_medium_text( value = 'netwr'   ).
+lr_column->set_short_text( value = ' netwr .'   ).
+
+
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'WAERK'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+"Call the below method to change the column anme
+lr_column->set_long_text( value = 'waerk'   ).
+lr_column->set_medium_text( value = 'waerk'   ).
+lr_column->set_short_text( value = ' waerk .'   ).
+
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'BUKRS'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+"Call the below method to change the column anme
+lr_column->set_long_text( value = 'BUKRS'   ).
+lr_column->set_medium_text( value = 'BUKRS'   ).
+lr_column->set_short_text( value = ' BUKRS .'   ).
+
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'NETWR'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+"Call the below method to change the column anme
+lr_column->set_long_text( value = 'netwr'   ).
+lr_column->set_medium_text( value = 'netwr'   ).
+lr_column->set_short_text( value = ' netwr .'   ).
+
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'WAVWR'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+"Call the below method to change the column anme
+lr_column->set_long_text( value = 'WAVWR'   ).
+lr_column->set_medium_text( value = 'WAVWR'   ).
+lr_column->set_short_text( value = 'WAVWR'   ).
+
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'BELNR'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+"Call the below method to change the column anme
+lr_column->set_long_text( value = 'BELNR'   ).
+lr_column->set_medium_text( value = 'BELNR'   ).
+lr_column->set_short_text( value = ' BELNR .'   ).
+
+TRY.
+    lr_column =  lr_columns->get_column( columnname = 'MONAT'   ).
+  CATCH cx_salv_not_found .
+ENDTRY.
+"Call the below method to change the column anme
+lr_column->set_long_text( value = 'MONAT'   ).
+lr_column->set_medium_text( value = 'MONAT'   ).
+lr_column->set_short_text( value = ' MONAT .'   ).
+
+
+
+DATA(lr_alv_tollbar) =  NEW cl_salv_functions_list( ).
+
+
+lr_alv_tollbar = lr_alv->get_functions( ).
+lr_alv_tollbar->set_all(
+    value = if_salv_c_bool_sap=>true
+).
+
+*************************************************
+* Aggregations and SUM
+*************************************************
+lr_aggregations = lr_alv->get_aggregations( ).
+*toolbar = gr_table->get_functions( ) .
+*toolbar->set_all(
+*      value  = if_salv_c_bool_sap=>true
+*       ).
+
+lr_aggregations->clear( ).
+lr_groups = lr_alv->get_sorts( ) .
+lr_groups->clear( ).
+
+TRY.
+    lr_groups->add_sort(
+   columnname = 'BUKRS'
+   position   = 1
+   subtotal   = abap_true
+   sequence   = if_salv_c_sort=>sort_up ).
+
+  CATCH cx_salv_not_found cx_salv_data_error cx_salv_existing.
+ENDTRY.
+
+
+TRY.
+    lr_groups->add_sort(
+   columnname = 'WERKS'
+   position   = 2
+   subtotal   = abap_true
+   sequence   = if_salv_c_sort=>sort_up ).
+
+  CATCH cx_salv_not_found cx_salv_data_error cx_salv_existing.
+ENDTRY.
+*
+
+TRY.
+    lr_aggregations->add_aggregation( columnname = 'NETWR' ).
+  CATCH cx_salv_not_found cx_salv_data_error cx_salv_existing.
+ENDTRY.
+
+
+*************************************************
+*  DISPLAY  ALV
+*************************************************
+lr_alv->display( ).
+
+
+CLASS zcl_main IMPLEMENTATION.
+
+  METHOD execute.
+
+*    pass details into Table VBRK and Fetch Billing Doc No – VBELV, Currency, Billing Date, Company Code and Net Value
+    SELECT a~vbeln, "Billing Document
+           b~posnr, "Billing item
+           a~waerk, "SD Document Currency
+           a~fkdat, "Billing date for billing index and printout
+           a~bukrs, "Company Code
+           a~netwr, "Net Value in Document Currency
+           b~matnr, "Material Number
+           b~wavwr, "Cost in document currency
+*            b~vbelv,
+           b~werks "Plant
+      FROM vbrk AS a INNER JOIN vbrp AS b
+        ON a~vbeln EQ b~vbeln
+      INTO TABLE @DATA(lt_vbrk) UP TO 1000 ROWS
+      WHERE bukrs IN @s_bukrs
+        AND werks IN @s_werks
+        AND fkdat IN @s_fkdat
+        AND a~netwr IN @s_netwr.
+*        ORDER BY a~vbeln ,b~posnr.
+    IF sy-subrc EQ 0 AND lt_vbrk IS NOT INITIAL.
+      SORT lt_vbrk BY vbeln posnr.
+      DELETE ADJACENT DUPLICATES FROM lt_vbrk COMPARING vbeln posnr.
+
+*  **,  Pass Billing Invoice VBELV to table VBFA and get Delivery Doc number (Ref Document) – VGBEL
+      SELECT vbelv
+             vbeln                     "VGBEL DOES NOT EXIST IN VBFA
+             posnn
+        FROM vbfa
+*        INTO TABLE @DATA(lt_vbfa)
+        INTO TABLE lt_vbfa
+        FOR ALL ENTRIES IN lt_vbrk
+        WHERE vbeln EQ lt_vbrk-vbeln
+          AND posnn EQ lt_vbrk-posnr
+          AND vbtyp_n = 'M'. "Document category of subsequent document
+*         and VBTYP_V	= 'J' VBTYP_V. "Document category of preceding SD document
+      IF sy-subrc EQ 0 AND lt_vbfa IS NOT INITIAL.
+
+*       Pass Delivery Document Number VBELV to Table LIKP VBELN Field(Delivery) and get Shipping Date – LDDAT and Promised Date – LFDAT
+        SELECT vbeln AS deliv,"Delivery
+               lddat,"Shipping Loading Date
+               lfdat "Delivery Date
+          FROM likp
+          INTO TABLE @DATA(lt_likp)
+          FOR ALL ENTRIES IN @lt_vbfa
+              WHERE vbeln EQ @lt_vbfa-vbelv
+                AND lddat IN @s_lddat.
+
+      ENDIF.
+*      For getting Accounting Period Pass VBELN in BSEG and fetch BELNR
+      SELECT bukrs,
+             belnr,
+             gjahr,
+             buzei,
+             vbeln
+      FROM bseg
+      INTO TABLE @DATA(lt_bseg)
+      FOR ALL ENTRIES IN @lt_vbrk
+      WHERE vbeln EQ @lt_vbrk-vbeln
+        AND bukrs EQ @lt_vbrk-bukrs ORDER BY PRIMARY KEY.
+      IF sy-subrc EQ 0.
+*        For getting Accounting Period Pass VBELN in BSEG and fetch BELNR and Pass BELNR to BKPF to fetch MONAT(Period)
+        SELECT belnr,
+               monat
+        FROM bkpf
+        INTO TABLE @DATA(lt_bkpf)
+        FOR ALL ENTRIES IN @lt_bseg
+        WHERE bukrs EQ @lt_bseg-bukrs
+         AND  belnr EQ @lt_bseg-belnr
+         AND  gjahr EQ @lt_bseg-gjahr.
+      ENDIF.
+    ENDIF.
+
+*    populate final internal table.
+    LOOP AT lt_vbrk ASSIGNING FIELD-SYMBOL(<lfs_vbrk>).
+      DATA(ls_vbfa) = VALUE #( lt_vbfa[ vbeln = <lfs_vbrk>-vbeln posnn = <lfs_vbrk>-posnr ] OPTIONAL ).
+      DATA(ls_likp) = VALUE #( lt_likp[ deliv = ls_vbfa-vbelv ] OPTIONAL ).
+
+*    Check if the promised date is in the following accounting period or FUTURE
+      IF ls_likp-lddat > sy-datum.
+        "future
+      ELSE.
+        "past
+      ENDIF.
+
+
+*     Add new line to Final internal Table
+      APPEND INITIAL LINE TO lt_final1 ASSIGNING FIELD-SYMBOL(<lfs_final>).
+*     Populate Values
+      <lfs_final> = VALUE #( vbeln = <lfs_vbrk>-vbeln    "Billing Document
+                             fkdat = <lfs_vbrk>-fkdat    "Billing date for billing index and printout
+                             deliv = ls_vbfa-vbelv       "Delivery
+                             matnr = <lfs_vbrk>-matnr    "Material Number
+                             werks = <lfs_vbrk>-werks    "Plant
+                             lddat = ls_likp-lddat       "Shipping Loading Date
+                             lfdat = ls_likp-lddat       "Delivery Date
+                             netwr = <lfs_vbrk>-netwr    "Net Value in Document Currency
+                             waerk = <lfs_vbrk>-waerk    "SD Document Currency
+                             bukrs = <lfs_vbrk>-bukrs    "Company Code
+                             wavwr = <lfs_vbrk>-wavwr ). "Cost in document currency
+    ENDLOOP.
+
+
+  ENDMETHOD.
+ENDCLASS.
