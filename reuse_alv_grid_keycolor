@@ -1,0 +1,392 @@
+
+REPORT zotc_sp_bo_release_log MESSAGE-ID zptp_msg_sp_iml.
+
+
+*TABLES: ztotc_borls_log.
+
+TYPE-POOLS: abap, slis.
+
+
+DATA:
+  it_data TYPE HASHED TABLE OF ztotc_borls_log
+    WITH UNIQUE KEY zotc_prc_date zotc_entry_seq,
+  it_alv  TYPE STANDARD TABLE OF zsotc_borls_log,
+  wa_alv  TYPE zsotc_borls_log.
+
+FIELD-SYMBOLS:
+  <fs_data> TYPE ztotc_borls_log,
+  <fs_fcat> TYPE slis_fieldcat_alv.
+
+CONSTANTS:
+  c_ddic_struc TYPE dd02l-tabname VALUE 'ZSOTC_BORLS_LOG',
+  c_long       TYPE char1         VALUE 'L'.
+
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE text-b01.
+SELECT-OPTIONS:
+  s_crdat FOR ztotc_borls_log-crdat,
+  s_crtim FOR ztotc_borls_log-crtim,
+  s_uname FOR ztotc_borls_log-cr_usnam,
+  s_vbeln FOR ztotc_borls_log-vbeln,
+  s_refno FOR ztotc_borls_log-zzsp_ref_num,
+  s_bstkd FOR ztotc_borls_log-bstkd,
+  s_dflag FOR ztotc_borls_log-def_flag,
+  s_reldt FOR ztotc_borls_log-planned_release_date,
+  s_erdat FOR ztotc_borls_log-erdat,
+  s_erzet FOR ztotc_borls_log-erzet,
+  s_ernam FOR ztotc_borls_log-ernam,
+  s_kdgrp FOR ztotc_borls_log-kdgrp,
+  s_kunnr FOR ztotc_borls_log-kunnr,
+  s_kunwe FOR ztotc_borls_log-kunwe,
+  s_zdshp FOR ztotc_borls_log-zzship_drirect,
+  s_ordnm FOR ztotc_borls_log-zzord_num,
+  s_auart FOR ztotc_borls_log-auart,
+  s_augru FOR ztotc_borls_log-augru,
+  s_lprio FOR ztotc_borls_log-lprio,
+  s_werks FOR ztotc_borls_log-werks,
+  s_matwa FOR ztotc_borls_log-matwa,
+  s_kdmat FOR ztotc_borls_log-kdmat.
+SELECTION-SCREEN END   OF BLOCK b1.
+
+
+INITIALIZATION.
+  PERFORM f_free_abap_memory.
+
+
+START-OF-SELECTION.
+  PERFORM: f_get_data,
+           f_consolidate_date.
+
+
+END-OF-SELECTION.
+  PERFORM: f_display_output.
+
+
+*&---------------------------------------------------------------------*
+*&      Form  F_FREE_ABAP_MEMORY
+*&---------------------------------------------------------------------*
+*       Free ABAP Memory.
+*----------------------------------------------------------------------*
+FORM f_free_abap_memory .
+  FREE: it_data[].
+ENDFORM.                    " F_FREE_ABAP_MEMORY
+
+*&---------------------------------------------------------------------*
+*&      Form  F_GET_DATA
+*&---------------------------------------------------------------------*
+*       Get data from SAP tables.
+*----------------------------------------------------------------------*
+FORM f_get_data .
+
+  FREE it_data[].
+  SELECT *
+    FROM ztotc_borls_log
+    INTO TABLE it_data[]
+    WHERE vbeln                IN s_vbeln
+      AND zzsp_ref_num         IN s_refno
+      AND bstkd                IN s_bstkd
+      AND def_flag             IN s_dflag
+      AND planned_release_date IN s_reldt
+      AND erdat                IN s_erdat
+      AND erzet                IN s_erzet
+      AND ernam                IN s_ernam
+      AND kdgrp                IN s_kdgrp
+      AND kunnr                IN s_kunnr
+      AND kunwe                IN s_kunwe
+      AND zzship_drirect       IN s_zdshp
+      AND zzord_num            IN s_ordnm
+      AND auart                IN s_auart
+      AND augru                IN s_augru
+      AND lprio                IN s_lprio
+      AND werks                IN s_werks
+      AND matwa                IN s_matwa
+      AND kdmat                IN s_kdmat
+      AND crdat                IN s_crdat
+      AND crtim                IN s_crtim
+      AND cr_usnam             IN s_uname.
+  IF sy-subrc NE 0.
+    MESSAGE s030. "No data found.
+    LEAVE LIST-PROCESSING.
+  ENDIF.
+
+ENDFORM.                    " F_GET_DATA
+
+*&---------------------------------------------------------------------*
+*&      Form  F_CONSOLIDATE_DATE
+*&---------------------------------------------------------------------*
+*       Consolidate Data.
+*----------------------------------------------------------------------*
+FORM f_consolidate_date .
+  CHECK it_data[] IS NOT INITIAL.
+
+  UNASSIGN <fs_data>.
+  CLEAR wa_alv.
+  LOOP AT it_data[] ASSIGNING <fs_data>.
+
+    wa_alv-zotc_entry_seq       = <fs_data>-zotc_entry_seq.
+    wa_alv-crdat                = <fs_data>-crdat.
+    wa_alv-crtim                = <fs_data>-crtim.
+    wa_alv-cr_usnam             = <fs_data>-cr_usnam.
+    wa_alv-vbeln                = <fs_data>-vbeln.
+    wa_alv-zzsp_ref_num         = <fs_data>-zzsp_ref_num.
+    wa_alv-bstkd                = <fs_data>-bstkd.
+    wa_alv-zz_upgr_ind          = <fs_data>-zz_upgr_ind.
+    wa_alv-zotc_upg_date        = <fs_data>-zotc_upg_date.
+    wa_alv-def_flag             = <fs_data>-def_flag.
+    wa_alv-planned_release_date = <fs_data>-planned_release_date.
+    wa_alv-erdat                = <fs_data>-erdat.
+    wa_alv-erzet                = <fs_data>-erzet.
+    wa_alv-ernam                = <fs_data>-ernam.
+    wa_alv-kdgrp                = <fs_data>-kdgrp.
+    wa_alv-kunnr                = <fs_data>-kunnr.
+    wa_alv-name1                = <fs_data>-name1.
+    wa_alv-kunwe                = <fs_data>-kunwe.
+    wa_alv-kunwe_name1          = <fs_data>-kunwe_name1.
+    wa_alv-zzship_drirect       = <fs_data>-zzship_drirect.
+    wa_alv-zzord_num            = <fs_data>-zzord_num.
+    wa_alv-auart                = <fs_data>-auart.
+    wa_alv-augru                = <fs_data>-augru.
+    wa_alv-augru_bezei          = <fs_data>-augru_bezei.
+    wa_alv-lprio                = <fs_data>-lprio.
+    wa_alv-lprio_text           = <fs_data>-lprio_text.
+    wa_alv-posnr                = <fs_data>-posnr.
+    wa_alv-werks                = <fs_data>-werks.
+    wa_alv-matwa                = <fs_data>-matwa.
+    wa_alv-hof                  = <fs_data>-hof.
+    wa_alv-kdmat                = <fs_data>-kdmat.
+    wa_alv-maktx                = <fs_data>-maktx.
+    wa_alv-kwmeng               = <fs_data>-kwmeng.
+    wa_alv-omeng                = <fs_data>-omeng.
+    wa_alv-bmeng                = <fs_data>-bmeng.
+    wa_alv-werks_d              = <fs_data>-werks_d.
+    wa_alv-lgort_sp             = <fs_data>-lgort_sp.
+    wa_alv-allc_qty             = <fs_data>-allc_qty.
+    wa_alv-allc_plant           = <fs_data>-allc_plant.
+    wa_alv-allc_lgort           = <fs_data>-allc_lgort.
+    wa_alv-allc_result          = <fs_data>-allc_result.
+
+    APPEND wa_alv TO it_alv[].
+    CLEAR wa_alv.
+  ENDLOOP.
+
+  UNASSIGN <fs_data>.
+  FREE it_data[].
+ENDFORM.                    " F_CONSOLIDATE_DATE
+
+*&---------------------------------------------------------------------*
+*&      Form  F_DISPLAY_OUTPUT
+*&---------------------------------------------------------------------*
+*       Display Output.
+*----------------------------------------------------------------------*
+FORM f_display_output .
+  CHECK it_alv[] IS NOT INITIAL.
+
+  DATA:
+    lt_fcat     TYPE STANDARD TABLE OF slis_fieldcat_alv,
+    lwa_layout  TYPE slis_layout_alv,
+    lwa_variant TYPE disvariant.
+
+  SORT it_alv[] BY crdat zotc_entry_seq crtim.
+
+  PERFORM f_get_field_cat TABLES lt_fcat[].
+
+  lwa_layout-colwidth_optimize = abap_true.
+  lwa_layout-zebra             = abap_true.
+
+  lwa_variant-report = sy-repid.
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program = sy-repid
+      i_structure_name   = c_ddic_struc
+      is_layout          = lwa_layout
+      it_fieldcat        = lt_fcat[]
+      i_save             = abap_true
+      is_variant         = lwa_variant
+    TABLES
+      t_outtab           = it_alv[]
+    EXCEPTIONS
+      program_error      = 1
+      OTHERS             = 2.
+
+  CHECK sy-subrc EQ 0.
+
+  FREE lt_fcat[].
+ENDFORM.                    " F_DISPLAY_OUTPUT
+
+*&---------------------------------------------------------------------*
+*&      Form  F_GET_FIELD_CAT
+*&---------------------------------------------------------------------*
+*       Get ALV field catalog information from custom SAP DDIC Structure
+*----------------------------------------------------------------------*
+*      -->EX_FCAT  ALV Field Catalog table.
+*----------------------------------------------------------------------*
+FORM f_get_field_cat TABLES ex_fcat STRUCTURE <fs_fcat>.
+
+  FREE ex_fcat[].
+  CALL FUNCTION 'REUSE_ALV_FIELDCATALOG_MERGE'
+    EXPORTING
+      i_structure_name       = c_ddic_struc
+    CHANGING
+      ct_fieldcat            = ex_fcat[]
+    EXCEPTIONS
+      inconsistent_interface = 1
+      program_error          = 2
+      OTHERS                 = 3.
+
+  CHECK sy-subrc EQ 0.
+
+  UNASSIGN <fs_fcat>.
+  LOOP AT ex_fcat ASSIGNING <fs_fcat>.
+    <fs_fcat>-ddictxt = c_long.
+    IF <fs_fcat>-fieldname EQ 'ZOTC_ENTRY_SEQ' OR
+       <fs_fcat>-fieldname EQ 'CRDAT' OR
+       <fs_fcat>-fieldname EQ 'CRTIM'.
+
+      <fs_fcat>-key = abap_true.
+    ENDIF.
+  ENDLOOP.
+  UNASSIGN <fs_fcat>.
+ENDFORM.                    " F_GET_FIELD_CAT
+
+
+
+
+
+
+
+
+
+
+
+**report  y_raja_salv.
+*DATA: gt_outtab TYPE TABLE OF sflight.
+*DATA: toolbar TYPE REF TO cl_salv_functions_list .
+*
+*DATA: gr_table  TYPE REF TO cl_salv_table.
+*DATA: lr_aggregations TYPE REF TO cl_salv_aggregations.
+*DATA: lr_groups TYPE REF TO cl_salv_sorts .
+*SELECT * FROM sflight INTO CORRESPONDING FIELDS OF TABLE gt_outtab.
+*
+*
+*CALL METHOD cl_salv_table=>factory
+*  IMPORTING
+*    r_salv_table = gr_table
+*  CHANGING
+*    t_table      = gt_outtab.
+*
+*lr_aggregations = gr_table->get_aggregations( ).
+*toolbar = gr_table->get_functions( ) .
+*toolbar->set_all(
+*      value  = if_salv_c_bool_sap=>true
+*       ).
+*
+*lr_aggregations->clear( ).
+*lr_groups = gr_table->get_sorts( ) .
+*lr_groups->clear( ).
+*
+*TRY.
+*    lr_groups->add_sort(
+*   columnname = 'CARRID'
+*   position   = 1
+*   subtotal   = abap_true
+*   sequence   = if_salv_c_sort=>sort_up ).
+*
+*  CATCH cx_salv_not_found cx_salv_data_error cx_salv_existing.
+*ENDTRY.
+
+
+TRY.
+    lr_groups->add_sort(
+   columnname = 'PLANETYPE'
+   position   = 2
+   subtotal   = abap_true
+   sequence   = if_salv_c_sort=>sort_up ).
+
+  CATCH cx_salv_not_found cx_salv_data_error cx_salv_existing.
+ENDTRY.
+*
+
+TRY.
+    lr_aggregations->add_aggregation( columnname = 'SEATSMAX' ).
+  CATCH cx_salv_not_found cx_salv_data_error cx_salv_existing.
+ENDTRY.
+
+
+gr_table->display( ).
+
+
+**select single * FROM likp INTO @DATA(ls_likp) WHERE vbeln = '0020000071'
+*
+*SELECT a~vbeln, "Billing Document
+*       b~posnr, "Billing item
+*       a~waerk, "SD Document Currency
+*       a~fkdat, "Billing date for billing index and printout
+*       a~bukrs, "Company Code
+*       a~netwr, "Net Value in Document Currency
+*       b~matnr, "Material Number
+*       b~wavwr, "Cost in document currency
+**            b~vbelv,
+*       b~werks "Plant
+*  FROM vbrk AS a INNER JOIN vbrp AS b
+*
+*    ON a~vbeln EQ b~vbeln
+*  INTO TABLE @DATA(lt_vbrk)
+*  UP TO 1000 ROWS.
+*
+*IF lt_vbrk IS NOT INITIAL.
+*  SELECT * FROM vbfa INTO TABLE @DATA(lt_vbfa)
+*    FOR ALL ENTRIES IN @lt_vbrk
+**  WHERE vbeln = '0090023037'.
+*   WHERE vbeln = @lt_vbrk-vbeln.
+*  IF lt_vbfa IS NOT INITIAL.
+*    SELECT * FROM likp INTO TABLE @DATA(lt_likp)
+*           FOR ALL ENTRIES IN @lt_vbfa
+*           WHERE vbeln EQ @lt_vbfa-vbeln.
+*    .
+*  ENDIF..
+*
+*  SELECT * FROM bseg INTO TABLE @DATA(lt_bseg)
+*    FOR ALL ENTRIES IN @lt_vbrk
+*    WHERE vbeln EQ @lt_vbrk-vbeln.
+*
+*  IF sy-subrc EQ 0.
+*    SELECT belnr , monat FROM bkpf INTO TABLE @DATA(lt_bkpf)
+*    FOR ALL ENTRIES IN @lt_bseg
+*    WHERE belnr EQ @lt_bseg-belnr .
+*  ENDIF.
+*ENDIF.
+*
+*LOOP AT lt_vbrk ASSIGNING FIELD-SYMBOL(<lfs_vbrk>).
+*
+*  DATA(ls_vbfa) = VALUE vbfa( lt_vbfa[ vbeln = <lfs_vbrk>-vbeln ] ).
+*  DATA(ls_likp) = VALUE likp( lt_likp[ vbeln = ls_vbfa-vbeln ] ).
+*  DATA(s_bkpf) = VALUE bkpf( lt_bkpf[ belnr = VALUE #( lt_bseg[ vbeln = <lfs_vbrk>-vbeln ] OPTIONAL ) ]  ).
+*
+*  IF sy-subrc EQ 0.
+*
+*  ENDIF.
+*ENDLOOP.
+*
+*
+*IF sy-subrc EQ 0.
+**    LDDAT                                      20130322
+**    IF ls_likp-lddat > sy-datum.
+**      WRITE 'kaay'.
+**      else.
+**        WRITE 'pand'.
+**    ENDIF.
+*
+*ENDIF.
+
+*TABLES: ekko, ekpo , adr6.
+*
+*DATA: l_begda TYPE sy-datum.
+*DATA l_endda type sy-datum.
+*
+*DATA l_gm_email type char30.
+*
+*DATA l_dm_email TYPE char30.
+*
+*DATA l_dm_name type emnam.
+
+*galti se change
