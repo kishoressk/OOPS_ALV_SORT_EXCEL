@@ -1,0 +1,205 @@
+REPORT zptp_sp_vnd_part_list.
+
+DATA : lv_so_lifnr TYPE eina-lifnr,
+       lv_so_idnlf TYPE eina-idnlf,
+       lv_so_matnr TYPE eina-matnr,
+       lv_so_ekorg TYPE eine-ekorg,
+       lv_so_werks TYPE marc-werks.
+
+SELECTION-SCREEN BEGIN OF BLOCK b1
+          WITH FRAME TITLE title.
+
+SELECT-OPTIONS : s_lifnr FOR lv_so_lifnr,
+                 s_idnlf FOR lv_so_idnlf,
+                 s_matnr FOR lv_so_matnr.
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+SELECTION-SCREEN BEGIN OF BLOCK b2
+          WITH FRAME TITLE title2.
+
+
+
+PARAMETERS : p_langu TYPE sy-langu,
+             p_ekorg TYPE ekorg,
+             p_werks TYPE werks_d.
+
+SELECTION-SCREEN END OF BLOCK b2.
+
+INITIALIZATION.
+  title = 'Vendor part Number'(001).
+  title2 = 'Technical Parameter'(002).
+
+AT SELECTION-SCREEN ON BLOCK B1.
+  IF s_lifnr IS INITIAL AND s_idnlf IS INITIAL AND s_matnr IS INITIAL.
+    MESSAGE 'Please input any values in any fields' TYPE 'E' DISPLAY LIKE 'S'.
+    RETURN.
+  ENDIF.
+
+START-OF-SELECTION.
+CLASS zcl_main DEFINITION.
+  PUBLIC SECTION.
+    METHODS : execute.
+
+  PRIVATE SECTION.
+    CLASS-DATA : BEGIN OF ls_selection,
+                   lv_lifnr TYPE eina-lifnr,
+                   lv_idnlf TYPE eina-idnlf,
+                   lv_matnr TYPE eina-matnr,
+                   lv_ekorg TYPE eine-ekorg,
+                   lv_werks TYPE marc-werks,
+                 END OF ls_selection.
+ENDCLASS.
+
+DATA(lobj) = NEW ZCL_main( ).
+
+
+
+***************************
+
+TYPES : BEGIN OF lty_final,
+          lifnr TYPE eina-lifnr,
+          idnlf TYPE eina-idnlf,
+          matnr TYPE eina-matnr,
+          maktx TYPE makt-maktx,
+          herkl TYPE marc-herkl,
+          stawn TYPE marc-stawn,
+        END OF lty_final.
+
+
+
+
+TYPES : lty_t_final TYPE TABLE OF lty_final.
+DATA : lt_final1 TYPE lty_t_final.
+
+
+*********************************
+
+lobj->execute( ).
+
+
+IF lt_final1 IS INITIAL.
+*   MESSAGE 'No DATA' TYPE 'E' DISPLAY LIKE 'S'.
+  MESSAGE 'No data is found' TYPE 'S'.
+  RETURN.
+
+ENDIF.
+
+TRY.
+    DATA : lr_alv TYPE REF TO cl_salv_table.
+    cl_salv_table=>factory(
+    IMPORTING
+      r_salv_table = lr_alv
+      CHANGING
+        t_table = lt_final1
+        ).
+  CATCH cx_salv_msg.
+ENDTRY.
+*
+DATA : lr_columns TYPE REF TO cl_salv_columns_table,
+       lr_column  TYPE REF TO cl_salv_column.
+" Get the reference of cl_salv_columns_table class.
+lr_columns = lr_alv->get_columns( ).
+"
+"
+TRY .
+    lr_column = lr_columns->get_column( columnname = 'LIFNR' ).
+
+  CATCH cx_salv_not_found.
+
+ENDTRY.
+"
+lr_column->set_long_text( value = 'Vendor' ).
+lr_column->set_medium_text( value = 'Vendor' ).
+lr_column->set_short_text( value = 'Vendor' ).
+
+TRY .
+    lr_column = lr_columns->get_column( columnname = 'MATNR' ).
+
+  CATCH cx_salv_not_found.
+
+ENDTRY.
+"
+lr_column->set_long_text( value = 'Material No.' ).
+lr_column->set_medium_text( value = 'Material No.' ).
+lr_column->set_short_text( value = 'Material' ).
+
+
+TRY .
+    lr_column = lr_columns->get_column( columnname = 'MAKTX' ).
+
+  CATCH cx_salv_not_found.
+
+ENDTRY.
+"
+lr_column->set_long_text( value = 'Material Description' ).
+lr_column->set_medium_text( value = 'Description' ).
+lr_column->set_short_text( value = 'Descr.' ).
+
+TRY .
+    lr_column = lr_columns->get_column( columnname = 'HERKL' ).
+
+  CATCH cx_salv_not_found.
+
+ENDTRY.
+"
+lr_column->set_long_text( value = 'Country of origin of the material' ).
+lr_column->set_medium_text( value = 'Country' ).
+lr_column->set_short_text( value = 'Country' ).
+
+TRY .
+    lr_column = lr_columns->get_column( columnname = 'STAWN' ).
+
+  CATCH cx_salv_not_found.
+
+ENDTRY.
+"
+lr_column->set_long_text( value = 'Comm./imp. code no.' ).
+lr_column->set_medium_text( value = 'Comm./imp. code no.' ).
+lr_column->set_short_text( value = 'Comm./imp.' ).
+
+
+DATA lr_alv_tollbar TYPE REF TO
+      cl_salv_functions_list.
+CREATE OBJECT lr_alv_tollbar.
+
+lr_alv_tollbar = lr_alv->get_functions( ).
+lr_alv_tollbar->set_all( value = abap_true ).
+
+*****Display ALV****
+
+lr_alv->display( ).
+
+*&---------------------------------------------------------------------*
+*&       Class (Implementation)  ZCL_main
+*&---------------------------------------------------------------------*
+*        Text
+*----------------------------------------------------------------------*
+CLASS zcl_main IMPLEMENTATION.
+
+  METHOD execute.
+*     Fetch data from tables EINA, EINE, MAKT, MARC.
+    SELECT a~lifnr
+           a~idnlf
+           a~matnr
+*           b~infnr
+           c~maktx
+*           c~spras
+           d~herkl
+           d~stawn
+      FROM eina AS a
+*          INNER JOIN eine AS b ON a~infnr = b~infnr
+          INNER JOIN makt AS c ON a~matnr = c~matnr
+          INNER JOIN marc AS d ON a~matnr = d~matnr
+*        INTO TABLE @DATA(lt_final)
+        INTO CORRESPONDING FIELDS OF TABLE lt_final1
+         WHERE a~lifnr IN s_lifnr
+         AND a~idnlf IN s_idnlf
+         AND a~matnr IN s_matnr
+*         AND b~ekorg EQ p_ekorg
+         AND a~loekz EQ space
+         AND c~spras EQ p_langu
+         AND d~werks EQ p_werks.
+
+  ENDMETHOD.
+ENDCLASS.               "ZCL_main
