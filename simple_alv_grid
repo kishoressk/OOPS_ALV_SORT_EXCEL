@@ -1,0 +1,203 @@
+REPORT zotc_sp_bo_release_log MESSAGE-ID zptp_msg_sp_iml.
+
+
+TYPE-POOLS: abap, slis.
+
+
+TYPES : BEGIN OF lty_final,
+          lifnr TYPE eina-lifnr,
+          idnlf TYPE eina-idnlf,
+          matnr TYPE eina-matnr,
+          maktx TYPE makt-maktx,
+          herkl TYPE marc-herkl,
+          stawn TYPE marc-stawn,
+        END OF lty_final.
+*
+DATA:
+  it_data TYPE SORTED TABLE OF lty_final
+    WITH NON-UNIQUE KEY lifnr , idnlf , matnr,
+  it_alv  TYPE STANDARD TABLE OF lty_final,
+  wa_alv  TYPE lty_final.
+
+
+
+DATA : lv_so_lifnr TYPE eina-lifnr,
+       lv_so_idnlf TYPE eina-idnlf,
+       lv_so_matnr TYPE eina-matnr,
+       lv_so_ekorg TYPE eine-ekorg,
+       lv_so_werks TYPE marc-werks.
+
+FIELD-SYMBOLS:
+  <fs_data> TYPE lty_final,
+  <fs_fcat> TYPE slis_fieldcat_alv.
+
+CONSTANTS:
+*  c_ddic_struc TYPE dd02l-tabname VALUE 'ZSOTC_BORLS_LOG',
+  c_ddic_struc TYPE dd02l-tabname VALUE 'LTY_FINAL',
+  c_long       TYPE char1         VALUE 'L'.
+
+
+SELECTION-SCREEN BEGIN OF BLOCK b1
+          WITH FRAME TITLE title.
+
+SELECT-OPTIONS : s_lifnr FOR lv_so_lifnr,
+                 s_idnlf FOR lv_so_idnlf,
+                 s_matnr FOR lv_so_matnr.
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+SELECTION-SCREEN BEGIN OF BLOCK b2
+          WITH FRAME TITLE title2.
+
+
+
+PARAMETERS : p_langu TYPE sy-langu,
+             p_ekorg TYPE ekorg,
+             p_werks TYPE werks_d.
+SELECTION-SCREEN END OF BLOCK b2.
+
+INITIALIZATION.
+  PERFORM f_free_abap_memory.
+
+
+START-OF-SELECTION.
+  PERFORM: f_get_data,
+           f_consolidate_date.
+
+AT SELECTION-SCREEN ON BLOCK B1.
+  IF s_lifnr IS INITIAL AND s_idnlf IS INITIAL AND s_matnr IS INITIAL.
+    MESSAGE 'Please input any values in any fields' TYPE 'E' DISPLAY LIKE 'S'.
+    RETURN.
+  ENDIF.
+
+
+
+END-OF-SELECTION.
+  PERFORM: f_display_output.
+
+
+*&---------------------------------------------------------------------*
+*&      Form  F_FREE_ABAP_MEMORY
+*&---------------------------------------------------------------------*
+*       Free ABAP Memory.
+*----------------------------------------------------------------------*
+FORM f_free_abap_memory .
+  FREE: it_data[].
+ENDFORM.                    " F_FREE_ABAP_MEMORY
+
+*&---------------------------------------------------------------------*
+*&      Form  F_GET_DATA
+*&---------------------------------------------------------------------*
+*       Get data from SAP tables.
+*----------------------------------------------------------------------*
+FORM f_get_data .
+
+  FREE it_data[].
+    SELECT a~lifnr
+           a~idnlf
+           a~matnr
+           c~maktx
+           d~herkl
+           d~stawn
+      FROM eina AS a
+*          INNER JOIN eine AS b ON a~infnr = b~infnr
+          INNER JOIN makt AS c ON a~matnr = c~matnr
+          INNER JOIN marc AS d ON a~matnr = d~matnr
+        INTO CORRESPONDING FIELDS OF TABLE it_data
+         WHERE a~lifnr IN s_lifnr
+         AND a~idnlf IN s_idnlf
+         AND a~matnr IN s_matnr
+*         AND b~ekorg EQ p_ekorg
+         AND a~loekz EQ space
+         AND c~spras EQ p_langu
+         AND d~werks EQ p_werks.
+  IF sy-subrc NE 0.
+    MESSAGE 'No data found' TYPE 'S'.
+    LEAVE LIST-PROCESSING.
+  ENDIF.
+
+ENDFORM.                    " F_GET_DATA
+
+*&---------------------------------------------------------------------*
+*&      Form  F_CONSOLIDATE_DATE
+*&---------------------------------------------------------------------*
+*       Consolidate Data.
+*----------------------------------------------------------------------*
+FORM f_consolidate_date .
+  CHECK it_data[] IS NOT INITIAL.
+
+  UNASSIGN <fs_data>.
+  CLEAR wa_alv.
+  LOOP AT it_data[] ASSIGNING <fs_data>.
+
+    wa_alv       = CORRESPONDING #( <fs_data> ).
+
+
+
+    APPEND wa_alv TO it_alv[].
+    CLEAR wa_alv.
+  ENDLOOP.
+
+  UNASSIGN <fs_data>.
+  FREE it_data[].
+ENDFORM.                    " F_CONSOLIDATE_DATE
+
+*&---------------------------------------------------------------------*
+*&      Form  F_DISPLAY_OUTPUT
+*&---------------------------------------------------------------------*
+*       Display Output.
+*----------------------------------------------------------------------*
+FORM f_display_output .
+  CHECK it_alv[] IS NOT INITIAL.
+
+  DATA:
+    lt_fcat     TYPE STANDARD TABLE OF slis_fieldcat_alv,
+    lwa_layout  TYPE slis_layout_alv,
+    lwa_variant TYPE disvariant.
+
+  SORT it_alv[] BY lifnr idnlf matnr.
+
+  PERFORM f_get_field_cat TABLES lt_fcat[].
+
+  lwa_layout-colwidth_optimize = abap_true.
+  lwa_layout-zebra             = abap_true.
+
+  lwa_variant-report = sy-repid.
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program = sy-repid
+      i_structure_name   = c_ddic_struc
+      is_layout          = lwa_layout
+      it_fieldcat        = lt_fcat[]
+      i_save             = abap_true
+      is_variant         = lwa_variant
+    TABLES
+      t_outtab           = it_alv[]
+    EXCEPTIONS
+      program_error      = 1
+      OTHERS             = 2.
+
+  CHECK sy-subrc EQ 0.
+
+  FREE lt_fcat[].
+ENDFORM.                    " F_DISPLAY_OUTPUT
+
+*&---------------------------------------------------------------------*
+*&      Form  F_GET_FIELD_CAT
+*&---------------------------------------------------------------------*
+*       Get ALV field catalog information from custom SAP DDIC Structure
+*----------------------------------------------------------------------*
+*      -->EX_FCAT  ALV Field Catalog table.
+*----------------------------------------------------------------------*
+FORM f_get_field_cat TABLES ex_fcat STRUCTURE <fs_fcat>.
+   refresh ex_fcat[].
+   ex_fcat[] = VALUE #(
+               ( fieldname = 'LIFNR' col_pos = 1 seltext_m = 'Vendor'         outputlen = 10 )
+               ( fieldname = 'IDNLF' col_pos = 2 seltext_m = 'Material Number Used by Vendor'  outputlen = 35 )
+               ( fieldname = 'MATNR' col_pos = 3 seltext_m = 'Material No'  outputlen = 18 )
+               ( fieldname = 'MAKTX' col_pos = 4 seltext_m = 'Material Description' outputlen = 40 )
+               ( fieldname = 'HERKL' col_pos = 5 seltext_m = 'Country' outputlen = 3 )
+               ( fieldname = 'STAWN' col_pos = 6 seltext_m = 'Comm./imp. code no.' outputlen = 17 )
+   ).
+
+ENDFORM.                    " F_GET_FIELD_CAT
